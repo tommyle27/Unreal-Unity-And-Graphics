@@ -1,0 +1,127 @@
+#version 330 core
+out vec4 FragColour;
+
+struct Material {
+	sampler2D floorTexture;
+
+	// kamala cube sampler2D
+	sampler2D kamalaTexture;
+
+	float shininess;
+};
+
+struct MoonLight {
+	vec3 direction;
+	
+	vec3 ambient;
+};
+
+struct SpotLight {
+	vec3 position;
+	vec3 direction;
+
+	float cutOff;
+	float outerCutOff;
+
+	vec3 ambient;
+	vec3 diffuse;
+	vec3 specular;
+};
+
+in vec2 TexCoord;
+in vec3 Normal;
+in vec3 FragPos;
+
+#define numberOfLights 3
+
+uniform MoonLight moon;
+uniform SpotLight obamaLight[numberOfLights];
+
+uniform Material material;
+uniform vec3 viewPos;
+
+// declare functions first
+vec3 calcMoonLight(MoonLight light, vec3 normal, vec3 viewDir);
+vec3 calcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir);
+
+void main() {
+	// set up basic properties for lighting (norm for specular, viewDir for proper light effects towards viewer)
+	vec3 norm = normalize(Normal);
+	vec3 viewDir = normalize(viewPos - FragPos);
+
+	// moon lighting
+	vec3 result = calcMoonLight(moon, norm, viewDir);
+
+	// spot lighting
+	for (int i = 0; i < numberOfLights; i++) {
+		result += calcSpotLight(obamaLight[i], norm, FragPos, viewDir);
+	}
+
+	FragColour = vec4(result, 1.0);
+}
+
+vec3 calcMoonLight(MoonLight light, vec3 normal, vec3 viewDir) {
+	vec3 lightDir = normalize(-light.direction);
+
+	vec3 ambient = light.ambient * vec3(texture(material.floorTexture, TexCoord));
+	ambient = light.ambient * vec3(texture(material.kamalaTexture, TexCoord));
+
+	return ambient;
+}
+
+
+// set up seperate shaders to turn obamids into light sources
+// then turn them into spot lights
+
+
+vec3 calcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir) {
+
+	// normalize light direction
+	vec3 lightDir = normalize(light.position - fragPos);
+
+	// calc diffuse shading 
+	//float diff = max(dot(normal, lightDir), 0.0); omit this code
+
+	// calc specular shading
+	vec3 reflectDir = reflect(-lightDir, normal);
+	float spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
+
+	// calc spotlight intensity
+	float theta = dot(-lightDir, vec3(0.0, -1.0, 0.0));
+	float epsilon = light.cutOff - light.outerCutOff;
+	float intensity = clamp((theta - light.outerCutOff) / epsilon, 0.0, 1.0);
+
+	// combine results then return
+	vec3 ambient = light.ambient * vec3(texture(material.floorTexture, TexCoord));
+
+	vec3 diffuse = light.diffuse * vec3(texture(material.floorTexture, TexCoord));
+
+	vec3 specular = light.specular * spec * vec3(texture(material.kamalaTexture, TexCoord));
+
+	diffuse *= intensity;
+	specular *= intensity;
+
+	return (ambient + diffuse + specular);
+
+}
+
+// spotlights no longer move... GREAT!!
+// but now they are only visible at certain angles
+// need to comb through DIFFUSE lighting calculations as I suspect that is where the issue stems from
+
+// FIXED:
+// SOLUTION - DIFFUSE CALCULATIONS ALTERED
+// first issue, no spot light showed at all, cause code: ambient += intensity; solution: omitted code, since ambient is set to vec3(0.0) this makes everything dark
+// second, solution spot lights were not static, cause: theta = dot(lightDir, normalize(light.direction)); solution: theta = dot(vec3(0.0, -1.0, 0.0), -lightDir);
+	// reason solutions works and or differences: first formula uses light.direction and normalises it which is based on the lights assigned direction vector, the second uses a fixed (vec3(0.0, -1.0, 0.0)), using a fixed vector is more reliable
+	// lightDir is used to get the lights specified direction commonly used for directional lighting, -lightDir is flipped with the fixed downward direction useful for detecting how upward a light direction relative to the world is
+// lastly spotlight diffuse lighting did not work, cause, including code: diff = max(dot(normal, lightDir), 0.0) in vec3 diffuse calculations. solution omit float diff and "diff" from: vec3 diffuse = light.diffuse * vec3(texture(material.floorTexture, TexCoord));
+	// the dot product produces a scalar value between [1.0, 0.0], with max the result is never negative to prevent confusing results. the result is used to determine the diffusal lights intensity, is 1.0 brightest possible value, if 0.0 dark
+	// removing this makes it so that the diffusal light is always bright and light in the desired area which is calculated by float intensity.
+
+// next steps:
+// specular lighting only works with camera position.z > 0
+	// might omit specular lighting as it appears strange for this project DONE
+// increase outer cone to give illusion for light scattering while maintaining smaller og cone of light DONE
+	// look into light scattering
+
