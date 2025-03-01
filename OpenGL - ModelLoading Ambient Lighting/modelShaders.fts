@@ -1,0 +1,29 @@
+#version 330 core
+out vec4 FragColor;
+
+// get Fragment position input 
+in vec3 FragPosition;
+
+// get normal input for directional lighting
+in vec3 Normal;
+
+// get TexCoords input
+in vec2 TexCoords;
+
+// set up uniforms
+uniform sampler2D texture_diffuse1;
+
+// get specular texture
+uniform sampler2D texture_specular1;
+
+
+void main() {    
+
+    // ambient lighting
+    vec4 ambientLight = vec4(0.2, 0.2, 0.2, 1.0);
+
+    vec4 ambient =  ambientLight * texture(texture_diffuse1, TexCoords);
+
+    FragColor = ambient;
+}
+
