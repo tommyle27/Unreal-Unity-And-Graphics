@@ -1,0 +1,73 @@
+#version 330 core
+out vec4 FragColor;
+
+// get Fragment position input 
+in vec3 FragPosition;
+
+// get normal input for directional lighting
+in vec3 Normal;
+
+// get TexCoords input
+in vec2 TexCoords;
+
+// set up uniforms
+uniform sampler2D texture_diffuse1;
+
+// get specular texture
+uniform sampler2D texture_specular1;
+
+struct pointLight {
+    // things needed for point light
+    float constant;
+    float linear;
+    float quadratic;
+
+    vec3 lightPosition;
+
+    vec4 diffuse;
+    vec4 specular;
+};
+
+
+// Things needed to calculate point light
+uniform vec3 viewPosition;
+uniform pointLight torch;
+
+
+
+void main() {    
+
+    // ambient lighting
+    vec4 ambientLight = vec4(0.2, 0.2, 0.2, 1.0);
+
+    // set up directional and diffusal lighting
+    vec3 norm = normalize(Normal);
+    vec3 viewDirection = normalize(viewPosition - FragPosition);
+
+    // get light direction for point light
+    vec3 lightDirection = normalize(torch.lightPosition - FragPosition);
+
+    // calc diffuse shading
+    float diff = max(dot(norm, lightDirection), 0.0);
+
+    // set up specular stuff later below:
+    vec3 reflectDirection = reflect(-lightDirection, Normal);
+    float spec = pow(max(dot(viewDirection, reflectDirection), 0.0), 32.0);
+
+    // calculate attenuation
+    float distance = length(torch.lightPosition - FragPosition);
+    float attenuation = 1.0 / (torch.constant + torch.linear * distance + torch.quadratic * (distance * distance));
+
+    // combine results
+    vec4 ambient =  ambientLight * texture(texture_diffuse1, TexCoords);
+    vec4 diffuse = torch.diffuse * diff * texture(texture_diffuse1, TexCoords);
+    vec4 specular = torch.specular * spec  * texture(texture_specular1, TexCoords);
+
+    // calc attenuation into lighting
+    diffuse *= attenuation;
+    specular *= attenuation;
+
+
+    FragColor = (ambient + diffuse + specular);
+}
+
